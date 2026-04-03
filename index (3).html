@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#E47911">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Sniff Amazon</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+  :root {
+    --orange: #E47911;
+    --orange-dark: #B85E08;
+    --bg: #f5f5f3;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.10);
+    --border-mid: rgba(0,0,0,0.18);
+    --text: #1a1a18;
+    --text-muted: #666660;
+    --text-hint: #999993;
+    --green-bg: #EAF3DE; --green-text: #2d5a0e; --green-border: #b5d97a;
+    --amber-bg: #FAEEDA; --amber-text: #7a4a08; --amber-border: #f0b84a;
+    --red-bg:   #FCEBEB; --red-text:   #8b1f1f; --red-border:   #f0a0a0;
+    --radius: 10px; --radius-lg: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.07);
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1a1a18; --surface:#252523; --border:rgba(255,255,255,0.10);
+      --border-mid:rgba(255,255,255,0.18); --text:#f0f0ee;
+      --text-muted:#aaaaaa; --text-hint:#777770;
+      --green-bg:#1a2e0a; --green-text:#8bc84a; --green-border:#3a5a18;
+      --amber-bg:#2e1e08; --amber-text:#f0b84a; --amber-border:#5a3a18;
+      --red-bg:#2e0a0a;   --red-text:#f08080;   --red-border:#5a1818;
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);font-size:16px}
+  body{display:flex;flex-direction:column;align-items:center}
+
+  /* ── App shell ── */
+  #app{width:100%;max-width:440px;min-height:100vh;display:flex;flex-direction:column;position:relative;background:var(--bg)}
+  .header{background:var(--surface);padding:14px 16px 13px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+  .logo{font-size:17px;font-weight:600;letter-spacing:-0.3px}
+  .logo span{color:var(--orange)}
+  .header-right{display:flex;align-items:center;gap:8px}
+  .badge{font-size:11px;font-weight:600;background:var(--orange);color:#fff;padding:2px 8px;border-radius:20px}
+  .hbtn{width:32px;height:32px;border:0.5px solid var(--border-mid);border-radius:8px;background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--text-muted)}
+
+  /* ── Nav ── */
+  .nav{display:flex;background:var(--surface);border-bottom:0.5px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:49px;z-index:19}
+  .nav::-webkit-scrollbar{display:none}
+  .nav-btn{flex:1;min-width:80px;padding:10px 6px 9px;font-size:12px;font-weight:500;border:none;background:transparent;cursor:pointer;color:var(--text-muted);border-bottom:2px solid transparent;white-space:nowrap;transition:color .15s,border-color .15s}
+  .nav-btn.active{color:var(--orange);border-bottom-color:var(--orange)}
+
+  /* ── Screens ── */
+  .screen{display:none;padding:12px 12px 80px;flex:1}
+  .screen.active{display:block}
+
+  /* ── Cron bar ── */
+  .cron-bar{background:var(--green-bg);border:0.5px solid var(--green-border);border-radius:var(--radius);padding:8px 12px;font-size:12px;color:var(--green-text);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .cron-bar.loading{background:var(--amber-bg);border-color:var(--amber-border);color:var(--amber-text)}
+  .cron-bar.error{background:var(--red-bg);border-color:var(--red-border);color:var(--red-text)}
+
+  /* ── Section title ── */
+  .sec{font-size:12px;font-weight:600;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px}
+
+  /* ── Filter row ── */
+  .filter-row{display:flex;gap:6px;margin-bottom:12px}
+  .filter-btn{flex:1;padding:7px 4px;font-size:12px;font-weight:500;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;color:var(--text-muted);transition:all .15s;white-space:nowrap}
+  .filter-btn.active{border-color:var(--border-mid);color:var(--text);background:var(--surface);box-shadow:var(--shadow)}
+
+  /* ── Product cards ── */
+  .product-card{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+  .product-card:hover{border-color:var(--border-mid);box-shadow:var(--shadow)}
+  .card-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+  .sem{font-size:24px;line-height:1.1;flex-shrink:0}
+  .card-info{flex:1;min-width:0}
+  .prod-name{font-size:14px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .prod-asin{font-size:11px;color:var(--text-hint);font-family:monospace}
+  .margin-badge{text-align:right;flex-shrink:0}
+  .mb-amount{font-size:15px;font-weight:700}
+  .mb-pct{font-size:11px;font-weight:500;display:block;margin-top:1px}
+  .green-color{color:var(--green-text)}
+  .amber-color{color:var(--amber-text)}
+  .red-color{color:var(--red-text)}
+
+  .ship-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);margin-bottom:8px;flex-wrap:wrap}
+  .ship-tag{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;border:0.5px solid}
+  .ship-green{background:var(--green-bg);color:var(--green-text);border-color:var(--green-border)}
+  .ship-amber{background:var(--amber-bg);color:var(--amber-text);border-color:var(--amber-border)}
+  .ship-red{background:var(--red-bg);color:var(--red-text);border-color:var(--red-border)}
+
+  .buybox-row{font-size:12px;color:var(--text-muted);margin-bottom:10px;padding:7px 10px;background:var(--bg);border-radius:var(--radius);border:0.5px solid var(--border)}
+
+  .action-row{display:flex;gap:7px}
+  .btn-pub{flex:2;padding:10px 8px;font-size:13px;font-weight:600;background:var(--orange);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;transition:background .15s,transform .1s;letter-spacing:.1px}
+  .btn-pub:hover{background:var(--orange-dark)}
+  .btn-pub:active{transform:scale(.97)}
+  .btn-pub:disabled{background:#ccc;cursor:not-allowed}
+  .btn-sec{flex:1;padding:10px 8px;font-size:12px;font-weight:500;background:transparent;color:var(--text-muted);border:0.5px solid var(--border-mid);border-radius:var(--radius);cursor:pointer;transition:background .15s}
+  .btn-sec:hover{background:var(--bg)}
+
+  /* ── Stat grid ── */
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+  .stat-card{background:var(--surface);border-radius:var(--radius);padding:12px 14px;border:0.5px solid var(--border)}
+  .stat-label{font-size:11px;color:var(--text-muted);margin-bottom:4px;font-weight:500}
+  .stat-val{font-size:22px;font-weight:700;color:var(--text)}
+
+  /* ── Upload ── */
+  .upload-area{background:var(--surface);border:1.5px dashed var(--border-mid);border-radius:var(--radius-lg);padding:28px 16px;text-align:center;margin-bottom:12px;cursor:pointer;transition:border-color .15s}
+  .upload-area:hover{border-color:var(--orange)}
+  .upload-icon{font-size:32px;margin-bottom:8px}
+  .upload-title{font-size:14px;font-weight:600;margin-bottom:4px}
+  .upload-sub{font-size:12px;color:var(--text-muted)}
+  #csv-file-input{display:none}
+
+  /* ── CSV cols table ── */
+  .csv-cols{background:var(--surface);border-radius:var(--radius);padding:0 12px;border:0.5px solid var(--border);margin-bottom:12px}
+  .col-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:13px}
+  .col-row:last-child{border-bottom:none}
+  .col-name{font-weight:600;color:var(--text);flex:1;font-family:monospace;font-size:12px}
+  .col-desc{color:var(--text-muted);font-size:12px}
+  .tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;letter-spacing:.2px}
+  .tag-req{background:var(--green-bg);color:var(--green-text)}
+  .tag-opt{background:var(--bg);color:var(--text-hint);border:0.5px solid var(--border)}
+
+  /* ── Config ── */
+  .config-row{background:var(--surface);border-radius:var(--radius);padding:11px 14px;display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;border:0.5px solid var(--border)}
+  .config-label{font-size:13px;font-weight:500}
+  .config-val{font-size:13px;color:var(--text-muted)}
+
+  /* ── Detail overlay ── */
+  .detail-overlay{display:none;position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;height:100%;background:var(--bg);overflow-y:auto;z-index:30;padding:16px 12px 80px}
+  .detail-overlay.open{display:block}
+  .detail-back{font-size:14px;color:var(--text-muted);cursor:pointer;margin-bottom:16px;display:flex;align-items:center;gap:5px;font-weight:500}
+  .detail-name{font-size:18px;font-weight:700;margin-bottom:4px;line-height:1.3}
+  .detail-asin{font-size:12px;color:var(--text-hint);font-family:monospace;margin-bottom:14px}
+  .detail-sem{font-size:14px;font-weight:600;padding:7px 12px;border-radius:var(--radius);margin-bottom:16px;display:inline-block;border:0.5px solid}
+  .detail-sem.green{background:var(--green-bg);color:var(--green-text);border-color:var(--green-border)}
+  .detail-sem.amber{background:var(--amber-bg);color:var(--amber-text);border-color:var(--amber-border)}
+  .detail-sem.red{background:var(--red-bg);color:var(--red-text);border-color:var(--red-border)}
+
+  .calc-block{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:14px;margin-bottom:12px}
+  .calc-row{display:flex;justify-content:space-between;font-size:13px;padding:7px 0;border-bottom:0.5px solid var(--border)}
+  .calc-row:last-of-type{border-bottom:none}
+  .calc-label{color:var(--text-muted)}
+  .calc-val{font-weight:600}
+  .calc-total{display:flex;justify-content:space-between;font-size:15px;padding:10px 0 0;font-weight:700;border-top:1.5px solid var(--border-mid);margin-top:4px}
+
+  .price-adj{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border);padding:14px;margin-bottom:14px}
+  .price-adj label{font-size:12px;color:var(--text-muted);font-weight:500;display:block;margin-bottom:8px}
+  .price-input{width:100%;padding:10px 12px;border:1.5px solid var(--border-mid);border-radius:var(--radius);font-size:17px;font-weight:700;background:var(--bg);color:var(--text);outline:none;transition:border-color .15s}
+  .price-input:focus{border-color:var(--orange)}
+
+  /* ── Empty / loading states ── */
+  .empty{text-align:center;padding:40px 20px;color:var(--text-muted)}
+  .empty-icon{font-size:36px;margin-bottom:10px}
+  .empty-title{font-size:15px;font-weight:600;margin-bottom:6px}
+  .empty-sub{font-size:13px;line-height:1.5}
+  .spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--orange);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Toast ── */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(10px);background:#1a1a18;color:#fff;padding:11px 20px;border-radius:var(--radius-lg);font-size:13px;font-weight:500;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:99;max-width:90%;text-align:center;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.success{background:#2d5a0e}
+  .toast.error{background:#8b1f1f}
+
+  /* ── Hunter explanation box ── */
+  .explain-box{font-size:12px;color:var(--text-muted);background:var(--bg);border-radius:var(--radius);padding:9px 11px;margin-bottom:10px;line-height:1.55;border:0.5px solid var(--border)}
+
+  /* ── Import progress ── */
+  .import-result{border-radius:var(--radius);padding:10px 12px;font-size:13px;margin-bottom:10px;border:0.5px solid}
+  .import-ok{background:var(--green-bg);color:var(--green-text);border-color:var(--green-border)}
+  .import-err{background:var(--red-bg);color:var(--red-text);border-color:var(--red-border)}
+
+  /* ── Utilities ── */
+  .full-btn{width:100%;padding:13px;font-size:14px}
+  .mt8{margin-top:8px}
+  .mt12{margin-top:12px}
+  .gap8{display:flex;flex-direction:column;gap:8px}
+  .ignored{opacity:.35;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">Sniff<span> Amazon</span></div>
+    <div class="header-right">
+      <div class="badge" id="header-badge">FBM</div>
+      <button class="hbtn" onclick="recalculate()" title="Recalcular todo">&#x21BB;</button>
+    </div>
+  </div>
+
+  <!-- NAV -->
+  <div class="nav">
+    <button class="nav-btn active" onclick="showScreen('resumen',this)">Resumen</button>
+    <button class="nav-btn" onclick="showScreen('hunter',this)">Hunter</button>
+    <button class="nav-btn" onclick="showScreen('cj',this)">🔍 CJ</button>
+    <button class="nav-btn" onclick="showScreen('subir',this)">CSV</button>
+    <button class="nav-btn" onclick="showScreen('config',this)">Config</button>
+  </div>
+
+  <!-- RESUMEN -->
+  <div id="screen-resumen" class="screen active">
+    <div id="cron-bar-resumen" class="cron-bar loading">
+      <div class="spinner"></div> Cargando datos...
+    </div>
+    <p class="sec">Filtrar por</p>
+    <div class="filter-row">
+      <button class="filter-btn active" id="f-all"    onclick="filterProducts('all',this)">Todos</button>
+      <button class="filter-btn"        id="f-green"  onclick="filterProducts('green',this)">&#128994; Verde</button>
+      <button class="filter-btn"        id="f-amber"  onclick="filterProducts('amber',this)">&#128993; Amarillo</button>
+      <button class="filter-btn"        id="f-red"    onclick="filterProducts('red',this)">&#128308; Rojo</button>
+    </div>
+    <div id="product-list"><div class="empty"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- BUY BOX HUNTER -->
+  <div id="screen-hunter" class="screen">
+    <div id="cron-bar-hunter" class="cron-bar loading">
+      <div class="spinner"></div> Analizando oportunidades...
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-label">Oportunidades altas</div><div class="stat-val" id="stat-green">—</div></div>
+      <div class="stat-card"><div class="stat-label">Margen promedio</div><div class="stat-val" id="stat-margin">—</div></div>
+    </div>
+    <p class="sec">Mejores oportunidades hoy</p>
+    <div id="hunter-list"><div class="empty"><div class="spinner"></div></div></div>
+  </div>
+
+  <!-- SUBIR CSV -->
+  <div id="screen-subir" class="screen">
+    <input type="file" id="csv-file-input" accept=".csv" onchange="handleCsvUpload(event)">
+    <div class="upload-area" onclick="document.getElementById('csv-file-input').click()">
+      <div class="upload-icon">&#128196;</div>
+      <div class="upload-title">Subir archivo CSV del proveedor</div>
+      <div class="upload-sub">Toca para seleccionar el archivo</div>
+    </div>
+    <div id="import-result-container"></div>
+
+    <p class="sec">Columnas del CSV</p>
+    <div class="csv-cols">
+      <div class="col-row"><span class="col-name">nombre_producto</span><span class="tag tag-req">REQUERIDO</span></div>
+      <div class="col-row"><span class="col-name">costo_producto</span><span class="tag tag-req">REQUERIDO</span></div>
+      <div class="col-row"><span class="col-name">costo_envio</span><span class="tag tag-req">REQUERIDO</span></div>
+      <div class="col-row"><span class="col-name">dias_envio</span><span class="tag tag-req">REQUERIDO</span></div>
+      <div class="col-row"><span class="col-name">asin</span><span class="tag tag-opt">opcional</span></div>
+      <div class="col-row"><span class="col-name">url_proveedor</span><span class="tag tag-opt">opcional</span></div>
+      <div class="col-row"><span class="col-name">sku_proveedor</span><span class="tag tag-opt">opcional</span></div>
+      <div class="col-row"><span class="col-name">bb_price</span><span class="col-desc">precio BuyBox Amazon</span><span class="tag tag-opt">opcional</span></div>
+      <div class="col-row"><span class="col-name">bb_days</span><span class="col-desc">días envío BuyBox</span><span class="tag tag-opt">opcional</span></div>
+    </div>
+
+    <div class="gap8">
+      <button class="btn-pub full-btn" onclick="downloadTemplate()">&#128229; Descargar plantilla de ejemplo</button>
+      <button class="btn-sec full-btn" style="padding:13px" onclick="exportAutods()">&#128228; Exportar aprobados para AutoDS</button>
+    </div>
+  </div>
+
+  <!-- CJ DROPSHIPPING -->
+  <div id="screen-cj" class="screen">
+    <div class="cron-bar" id="cj-sync-bar" style="cursor:pointer" onclick="cjSyncPrices()">
+      &#128260; Toca para sincronizar precios con CJdropshipping
+    </div>
+    <p class="sec">Buscar producto en CJdropshipping</p>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <input type="text" id="cj-search-input" placeholder="Ej: scalp massage brush"
+        style="flex:1;padding:10px 12px;border:0.5px solid var(--border-mid);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);outline:none"
+        onkeydown="if(event.key==='Enter')cjSearch()">
+      <button class="btn-pub" style="flex:0;padding:10px 16px" onclick="cjSearch()">Buscar</button>
+    </div>
+    <div id="cj-results"></div>
+  </div>
+
+  <!-- CONFIG -->
+  <div id="screen-config" class="screen">
+    <p class="sec">Estrategia de precio</p>
+    <div class="config-row"><span class="config-label">Delta precio objetivo</span><span class="config-val" id="cfg-delta">- $0.70</span></div>
+    <div class="config-row"><span class="config-label">Delta mínimo</span><span class="config-val" id="cfg-delta-min">- $0.50</span></div>
+    <div class="config-row"><span class="config-label">Delta máximo</span><span class="config-val" id="cfg-delta-max">- $1.00</span></div>
+    <p class="sec mt12">Umbrales de margen</p>
+    <div class="config-row"><span class="config-label">&#128994; Margen verde (mín.)</span><span class="config-val" id="cfg-verde">20%</span></div>
+    <div class="config-row"><span class="config-label">&#128993; Margen amarillo (mín.)</span><span class="config-val" id="cfg-amarillo">15%</span></div>
+    <p class="sec mt12">Envío y comisión</p>
+    <div class="config-row"><span class="config-label">Días extra aceptables</span><span class="config-val" id="cfg-dias">2 días</span></div>
+    <div class="config-row"><span class="config-label">Comisión Amazon (global)</span><span class="config-val" id="cfg-comision">12%</span></div>
+    <button class="btn-pub full-btn mt12" onclick="showToast('Edición de config disponible próximamente','')">Editar configuración</button>
+  </div>
+
+  <!-- DETAIL OVERLAY -->
+  <div class="detail-overlay" id="detail-overlay">
+    <div class="detail-back" onclick="closeDetail()">&#8592; Volver</div>
+    <div class="detail-name" id="d-name"></div>
+    <div class="detail-asin" id="d-asin"></div>
+    <div class="detail-sem" id="d-sem"></div>
+    <div class="calc-block" id="d-calcs"></div>
+    <div class="price-adj">
+      <label>Ajustar precio de venta antes de publicar</label>
+      <input type="number" class="price-input" id="d-price" step="0.01" min="0">
+    </div>
+    <button class="btn-pub full-btn" id="d-publish-btn" onclick="publishFromDetail()">&#128640; Guardar y publicar en Amazon</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : 'https://sniff-amazon-backend-production.up.railway.app';
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+var allProducts = [];
+var activeFilter = 'all';
+var currentDetail = null;
+var stats = {};
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function(){
+  loadProducts();
+  loadStats();
+  loadConfig();
+});
+
+// ─── LOAD PRODUCTS ────────────────────────────────────────────────────────────
+function loadProducts(){
+  fetch(API + '/api/products')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      allProducts = data.filter(function(p){ return p.status !== 'ignored'; });
+      renderProducts(activeFilter);
+      renderHunter();
+      updateCronBar(allProducts.length);
+    })
+    .catch(function(e){
+      setCronBar('error', '&#9888; No se pudo conectar con el backend. ¿Está corriendo? <code>uvicorn main:app</code>');
+      document.getElementById('product-list').innerHTML = emptyState('🔌','Backend no disponible','Asegúrate de que el servidor esté corriendo en localhost:8000');
+    });
+}
+
+function loadStats(){
+  fetch(API + '/api/stats')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      stats = data;
+      document.getElementById('stat-green').textContent  = data.green || '0';
+      document.getElementById('stat-margin').textContent = (data.avg_margin_pct || 0).toFixed(1) + '%';
+      var badge = document.getElementById('header-badge');
+      if(data.approved > 0) badge.textContent = data.approved + ' aprobados';
+      updateFilterLabels(data);
+    })
+    .catch(function(){});
+}
+
+function loadConfig(){
+  fetch(API + '/api/config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+      document.getElementById('cfg-delta').textContent     = '- $' + cfg.delta_precio_objetivo.toFixed(2);
+      document.getElementById('cfg-delta-min').textContent = '- $' + cfg.delta_precio_min.toFixed(2);
+      document.getElementById('cfg-delta-max').textContent = '- $' + cfg.delta_precio_max.toFixed(2);
+      document.getElementById('cfg-verde').textContent     = cfg.margen_minimo_verde + '%';
+      document.getElementById('cfg-amarillo').textContent  = cfg.margen_minimo_amarillo + '%';
+      document.getElementById('cfg-dias').textContent      = cfg.max_dias_extra_aceptables + ' días';
+      document.getElementById('cfg-comision').textContent  = cfg.comision_amazon_global + '%';
+    })
+    .catch(function(){});
+}
+
+// ─── RENDER PRODUCTS ──────────────────────────────────────────────────────────
+function renderProducts(filter){
+  var list = document.getElementById('product-list');
+  var filtered = allProducts.filter(function(p){
+    return filter === 'all' || p.semaforo === filter;
+  });
+
+  if(filtered.length === 0){
+    list.innerHTML = filter === 'all'
+      ? emptyState('📦','Sin productos','Sube un CSV desde la pestaña "Subir CSV" para empezar.')
+      : emptyState('🔍','Sin resultados en esta categoría','Prueba con otro filtro.');
+    return;
+  }
+
+  list.innerHTML = filtered.map(function(p){ return productCardHTML(p); }).join('');
+}
+
+function productCardHTML(p){
+  var semIcon = {'green':'&#128994;','amber':'&#128993;','red':'&#128308;'}[p.semaforo] || '&#128308;';
+  var noBb = !p.bb_price || p.bb_price <= 0;
+
+  var marginColor = p.margen_pct >= 20 ? 'green-color' : p.margen_pct >= 15 ? 'amber-color' : 'red-color';
+
+  var shipClass = p.dias_envio <= p.bb_days ? 'ship-green'
+                : p.dias_envio <= p.bb_days + 2 ? 'ship-amber' : 'ship-red';
+
+  var shippingHTML = noBb
+    ? '<span class="ship-tag ship-amber">Sin datos Amazon</span>'
+    : '<span class="ship-tag ' + shipClass + '">Yo: ' + p.dias_envio + 'd / BuyBox: ' + p.bb_days + 'd</span>';
+
+  var buyboxHTML = noBb
+    ? '<i>Añade bb_price y bb_days en el CSV para ver comparativa Buy Box</i>'
+    : 'BuyBox: $' + p.bb_price.toFixed(2) + ' &nbsp;·&nbsp; Mi oferta: <b>$' + (p.precio_recomendado||0).toFixed(2) + '</b>';
+
+  var marginHTML = noBb ? '<span class="red-color" style="font-size:12px">Sin precio</span>'
+    : '<div class="mb-amount ' + marginColor + '">$' + (p.margen_estimado||0).toFixed(2) + '</div>'
+    + '<span class="mb-pct ' + marginColor + '">' + (p.margen_pct||0).toFixed(1) + '%</span>';
+
+  return '<div class="product-card" id="card-'+p.id+'" onclick="openDetail('+p.id+')">'
+    + '<div class="card-top">'
+    + '<div class="sem">'+semIcon+'</div>'
+    + '<div class="card-info">'
+    + '<div class="prod-name">'+escHtml(p.nombre_producto)+'</div>'
+    + '<div class="prod-asin">'+(p.asin||'Sin ASIN')+'</div>'
+    + '</div>'
+    + '<div class="margin-badge">'+marginHTML+'</div>'
+    + '</div>'
+    + '<div class="ship-row">Envío: '+shippingHTML+'</div>'
+    + '<div class="buybox-row">'+buyboxHTML+'</div>'
+    + '<div class="action-row">'
+    + '<button class="btn-pub" onclick="event.stopPropagation();quickPublish('+p.id+',this)" '+(noBb?'disabled title="Añade bb_price para publicar"':'')+'>'
+    + (noBb ? 'Sin datos Amazon' : '&#128640; Publicar en Amazon') + '</button>'
+    + '<button class="btn-sec" onclick="event.stopPropagation();ignoreProduct('+p.id+',this)">Ignorar</button>'
+    + '</div>'
+    + '</div>';
+}
+
+// ─── RENDER HUNTER ────────────────────────────────────────────────────────────
+function renderHunter(){
+  var list = document.getElementById('hunter-list');
+  var cronH = document.getElementById('cron-bar-hunter');
+  var opportunities = allProducts
+    .filter(function(p){ return p.semaforo !== 'red' && p.bb_price > 0; })
+    .sort(function(a,b){ return b.score - a.score; });
+
+  if(opportunities.length === 0){
+    setCronBar('error','No hay oportunidades todavía · Sube un CSV con bb_price y bb_days','hunter');
+    list.innerHTML = emptyState('🔍','Sin oportunidades','Sube un CSV con los campos bb_price y bb_days para que el Hunter pueda analizar.');
+    return;
+  }
+
+  setCronBar('ok', '&#128269; Buy Box Hunter · ' + opportunities.length + ' oportunidades detectadas','hunter');
+
+  list.innerHTML = opportunities.map(function(p){
+    var semIcon = {'green':'&#128994; Alta','amber':'&#128993; Media'}[p.semaforo] || '&#128993; Media';
+    var myFaster = p.dias_envio <= p.bb_days;
+    var explain = 'Este producto se vende en Amazon a <b>$'+p.bb_price.toFixed(2)+'</b> con entrega en <b>'+p.bb_days+' días</b>. '
+      + 'Tu costo total es $'+(p.precio_compra_total||0).toFixed(2)+', entrega en <b>'+p.dias_envio+' días</b>. '
+      + 'Si lo vendes a <b>$'+(p.precio_recomendado||0).toFixed(2)+'</b>, serás más barato'
+      + (myFaster ? ' y más rápido' : '') + '. '
+      + 'Margen neto: <b>$'+(p.margen_estimado||0).toFixed(2)+' ('+(p.margen_pct||0).toFixed(1)+'%)</b>.';
+
+    return '<div class="product-card">'
+      + '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;font-weight:600">'+semIcon+' — Probabilidad Buy Box</div>'
+      + '<div class="prod-name" style="font-size:14px;margin-bottom:8px">'+escHtml(p.nombre_producto)+'</div>'
+      + '<div class="explain-box">'+explain+'</div>'
+      + '<div class="action-row">'
+      + '<button class="btn-pub" onclick="quickPublish('+p.id+',this)">&#128640; Publicar con precio recomendado</button>'
+      + '<button class="btn-sec" onclick="ignoreProduct('+p.id+',this)">Ignorar</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+// ─── PRODUCT ACTIONS ──────────────────────────────────────────────────────────
+function quickPublish(id, btn){
+  var orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Publicando...';
+  fetch(API + '/api/products/'+id+'/publish', {method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      showToast('&#10003; Publicado a $' + (data.price_used||0).toFixed(2), 'success');
+      var card = document.getElementById('card-'+id);
+      if(card) card.style.opacity = '0.5';
+      loadStats();
+    })
+    .catch(function(){
+      showToast('Error al publicar. ¿Backend disponible?','error');
+      btn.disabled = false;
+      btn.textContent = orig;
+    });
+}
+
+function ignoreProduct(id, btn){
+  fetch(API + '/api/products/'+id+'/ignore', {method:'POST'})
+    .then(function(){
+      var card = document.getElementById('card-'+id);
+      if(card){ card.classList.add('ignored'); setTimeout(function(){ card.remove(); },400); }
+      allProducts = allProducts.filter(function(p){ return p.id !== id; });
+      showToast('Producto ignorado por hoy','');
+    })
+    .catch(function(){ showToast('Error al ignorar','error'); });
+}
+
+function recalculate(){
+  showToast('Recalculando...','');
+  fetch(API + '/api/recalculate', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      showToast('&#10003; ' + data.recalculated + ' productos recalculados','success');
+      loadProducts();
+      loadStats();
+    })
+    .catch(function(){ showToast('Error al recalcular','error'); });
+}
+
+// ─── DETAIL ───────────────────────────────────────────────────────────────────
+function openDetail(id){
+  var p = allProducts.find(function(x){ return x.id === id; });
+  if(!p) return;
+  currentDetail = p;
+  document.getElementById('d-name').textContent = p.nombre_producto;
+  document.getElementById('d-asin').textContent = 'ASIN: ' + (p.asin || 'Sin ASIN') + (p.sku_proveedor ? '  ·  SKU: '+p.sku_proveedor : '');
+  var semEl = document.getElementById('d-sem');
+  var semMap = {green:['&#128994; Alta probabilidad de Buy Box','green'], amber:['&#128993; Probabilidad media de Buy Box','amber'], red:['&#128308; Probabilidad baja de Buy Box','red']};
+  var s = semMap[p.semaforo] || semMap.red;
+  semEl.innerHTML = s[0];
+  semEl.className = 'detail-sem ' + s[1];
+
+  var noBb = !p.bb_price || p.bb_price <= 0;
+  document.getElementById('d-calcs').innerHTML =
+    '<div class="calc-row"><span class="calc-label">Costo del producto</span><span class="calc-val">$'+(p.costo_producto||0).toFixed(2)+'</span></div>'
+    +'<div class="calc-row"><span class="calc-label">Costo de envío</span><span class="calc-val">$'+(p.costo_envio||0).toFixed(2)+'</span></div>'
+    +'<div class="calc-row"><span class="calc-label">Total mi costo</span><span class="calc-val">$'+(p.precio_compra_total||0).toFixed(2)+'</span></div>'
+    +'<div class="calc-row"><span class="calc-label">Comisión Amazon</span><span class="calc-val">$'+(p.comision_amazon||0).toFixed(2)+'</span></div>'
+    +(noBb ? '<div class="calc-row" style="color:var(--amber-text)"><span>Sin datos Amazon (bb_price)</span></div>'
+           : '<div class="calc-row"><span class="calc-label">BuyBox actual</span><span class="calc-val">$'+p.bb_price.toFixed(2)+' / '+p.bb_days+'d</span></div>')
+    +'<div class="calc-total"><span>Margen estimado</span><span style="color:'+(p.margen_estimado>=0?'var(--green-text)':'var(--red-text)')+'">$'+(p.margen_estimado||0).toFixed(2)+' ('+(p.margen_pct||0).toFixed(1)+'%)</span></div>';
+
+  document.getElementById('d-price').value = (p.precio_recomendado||0).toFixed(2);
+  var pb = document.getElementById('d-publish-btn');
+  pb.disabled = noBb;
+  document.getElementById('detail-overlay').classList.add('open');
+}
+
+function closeDetail(){
+  document.getElementById('detail-overlay').classList.remove('open');
+  currentDetail = null;
+}
+
+function publishFromDetail(){
+  if(!currentDetail) return;
+  var price = parseFloat(document.getElementById('d-price').value);
+  var btn = document.getElementById('d-publish-btn');
+  btn.disabled = true; btn.textContent = 'Publicando...';
+  fetch(API + '/api/products/'+currentDetail.id+'/publish', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({price: price})
+  })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      showToast('&#10003; Publicado a $'+price.toFixed(2),'success');
+      closeDetail();
+      loadStats();
+    })
+    .catch(function(){ showToast('Error al publicar','error'); btn.disabled=false; btn.textContent='&#128640; Guardar y publicar'; });
+}
+
+// ─── CSV UPLOAD ───────────────────────────────────────────────────────────────
+function handleCsvUpload(event){
+  var file = event.target.files[0];
+  if(!file) return;
+  var container = document.getElementById('import-result-container');
+  container.innerHTML = '<div class="import-result import-ok"><div class="spinner"></div> Importando '+file.name+'...</div>';
+
+  var fd = new FormData();
+  fd.append('file', file);
+  fetch(API + '/api/import-csv', {method:'POST', body:fd})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var errHtml = data.errors && data.errors.length
+        ? '<br><small>Errores: '+data.errors.slice(0,3).join(', ')+'</small>' : '';
+      container.innerHTML = '<div class="import-result import-ok">&#10003; '+data.imported+' productos importados'+errHtml+'</div>';
+      showToast('&#10003; CSV importado correctamente','success');
+      loadProducts();
+      loadStats();
+    })
+    .catch(function(){
+      container.innerHTML = '<div class="import-result import-err">&#9888; Error al importar. ¿Está el backend activo?</div>';
+    });
+  event.target.value = '';
+}
+
+function downloadTemplate(){
+  window.open(API + '/api/template-csv', '_blank');
+}
+
+function exportAutods(){
+  if(!stats.approved || stats.approved === 0){
+    showToast('No hay productos aprobados aún. Primero publica algunos.','');
+    return;
+  }
+  window.open(API + '/api/export-autods', '_blank');
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function showScreen(name, btn){
+  document.querySelectorAll('.screen').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.nav-btn').forEach(function(el){ el.classList.remove('active'); });
+  document.getElementById('screen-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name === 'hunter' && allProducts.length > 0) renderHunter();
+}
+
+function filterProducts(f, btn){
+  activeFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  renderProducts(f);
+}
+
+function updateCronBar(count){
+  var now = new Date();
+  var time = now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+  setCronBar('ok', '&#10003; Actualizado hoy a las ' + time + ' · ' + count + ' productos cargados');
+}
+
+function setCronBar(type, msg, target){
+  var ids = target ? ['cron-bar-'+target] : ['cron-bar-resumen','cron-bar-hunter'];
+  ids.forEach(function(id){
+    var el = document.getElementById(id);
+    if(!el) return;
+    el.className = 'cron-bar' + (type === 'error' ? ' error' : type === 'loading' ? ' loading' : '');
+    el.innerHTML = msg;
+  });
+}
+
+function updateFilterLabels(data){
+  document.getElementById('f-all').textContent   = 'Todos (' + data.total + ')';
+  document.getElementById('f-green').innerHTML   = '&#128994; Verde (' + data.green + ')';
+  document.getElementById('f-amber').innerHTML   = '&#128993; Amar. (' + data.amber + ')';
+  document.getElementById('f-red').innerHTML     = '&#128308; Rojo (' + data.red + ')';
+}
+
+function emptyState(icon, title, sub){
+  return '<div class="empty"><div class="empty-icon">'+icon+'</div><div class="empty-title">'+title+'</div><div class="empty-sub">'+sub+'</div></div>';
+}
+
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+
+// ─── CJ DROPSHIPPING ─────────────────────────────────────────────────────────
+function cjSearch(){
+  var q = document.getElementById('cj-search-input').value.trim();
+  if(!q){ showToast('Escribe un nombre de producto',''); return; }
+  var list = document.getElementById('cj-results');
+  list.innerHTML = '<div class="empty"><div class="spinner"></div> Buscando en CJdropshipping...</div>';
+  fetch(API + '/api/cj/search?q=' + encodeURIComponent(q))
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data.ok || !data.results.length){
+        list.innerHTML = '<div class="empty"><div class="empty-icon">&#128270;</div><div class="empty-title">Sin resultados</div><div class="empty-sub">Prueba con otro nombre en inglés</div></div>';
+        return;
+      }
+      list.innerHTML = data.results.map(function(p){
+        var stockColor = p.stock > 0 ? 'var(--green-text)' : 'var(--red-text)';
+        var stockText  = p.stock > 0 ? 'En stock ('+p.stock+')' : 'Sin stock';
+        return '<div class="product-card" style="margin-bottom:10px">'
+          + '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">' 
+          + (p.imagen ? '<img src="'+p.imagen+'" style="width:52px;height:52px;object-fit:cover;border-radius:8px;flex-shrink:0">' : '')
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="prod-name">'+escHtml(p.nombre_producto)+'</div>'
+          + '<div style="font-size:12px;color:var(--text-muted);margin-top:2px">PID: '+p.cj_pid+'</div>'
+          + '</div>'
+          + '<div style="text-align:right;flex-shrink:0">'
+          + '<div style="font-size:16px;font-weight:700;color:var(--text)">$'+p.cj_price.toFixed(2)+'</div>'
+          + '<div style="font-size:11px;color:var(--text-muted)">'+p.dias_envio_cj+' días envío</div>'
+          + '</div>'
+          + '</div>'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'
+          + '<span style="font-size:12px;font-weight:600;color:'+stockColor+'">'+stockText+'</span>'
+          + '<span style="font-size:11px;color:var(--text-hint)">'+escHtml(p.categoria)+'</span>'
+          + '</div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<button class="btn-pub" style="flex:1" onclick="importCjProduct('+JSON.stringify(p).replace(/"/g,'&quot;')+')">+ Importar a Sniff Amazon</button>'
+          + '<a href="'+p.url_cj+'" target="_blank" class="btn-sec" style="flex:0;padding:10px 12px;text-decoration:none">Ver en CJ</a>'
+          + '</div>'
+          + '</div>';
+      }).join('');
+    })
+    .catch(function(e){
+      list.innerHTML = '<div class="import-result import-err">&#9888; Error conectando con CJ API. ¿Configuraste CJ_API_KEY?</div>';
+    });
+}
+
+function importCjProduct(p){
+  var nombre = p.nombre_producto;
+  fetch(API + '/api/import-csv', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      products: [{
+        nombre_producto: nombre,
+        costo_producto:  p.cj_price,
+        costo_envio:     2.0,
+        dias_envio:      p.dias_envio_cj,
+        cj_pid:          p.cj_pid,
+        url_proveedor:   p.url_cj
+      }]
+    })
+  })
+  .then(function(){
+    showToast('&#10003; '+nombre+' importado','success');
+    loadProducts();
+    loadStats();
+  })
+  .catch(function(){ showToast('Error al importar','error'); });
+}
+
+function cjSyncPrices(){
+  var bar = document.getElementById('cj-sync-bar');
+  bar.innerHTML = '<div class="spinner"></div> Sincronizando precios con CJ...';
+  fetch(API + '/api/cj/sync-prices', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      bar.innerHTML = '&#10003; '+data.updated+' precios actualizados · '+data.out_of_stock+' sin stock';
+      loadProducts();
+      loadStats();
+    })
+    .catch(function(){
+      bar.innerHTML = '&#9888; Error sincronizando. ¿CJ_API_KEY configurada?';
+      bar.className = 'cron-bar error';
+    });
+}
+
+function showToast(msg, type){
+  var t = document.getElementById('toast');
+  t.innerHTML = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.className = 'toast'; }, 2800);
+}
+</script>
+</body>
+</html>
